@@ -1,7 +1,8 @@
-package initializer
+package constants
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"os"
 
@@ -11,6 +12,29 @@ import (
 
 var HMacSigningingSecret []byte
 var HashingSalt []byte
+var Db *sql.DB
+
+func initializeDb() error {
+	var err error
+	Db, err = sql.Open("sqlite3", "database.db")
+
+	if err != nil {
+		return err
+	}
+
+	q := `CREATE TABLE IF NOT EXISTS User (
+		   id INTEGER PRIMARY KEY AUTOINCREMENT,
+		   username text NOT NULL UNIQUE,
+		   password text NOT NULL
+		);`
+
+	_, err = Db.Exec(q)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func getHmacSigningSecret() ([]byte, error) {
 	secret := os.Getenv("HMAC_SIGNING_SECRET")
@@ -64,6 +88,10 @@ func Init() error {
 		return err
 	} else {
 		HashingSalt = key
+	}
+
+	if err := initializeDb(); err != nil {
+		return err
 	}
 
 	return nil
