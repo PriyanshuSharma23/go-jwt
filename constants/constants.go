@@ -8,6 +8,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"priyanshu.com/jwt/types"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var HMacSigningingSecret []byte

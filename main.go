@@ -1,19 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
+	"strings"
 
-	_ "github.com/mattn/go-sqlite3"
-	"golang.org/x/crypto/scrypt"
 	"priyanshu.com/jwt/constants"
+	"priyanshu.com/jwt/users"
 )
-
-type User struct {
-	Id       int
-	Username string
-	Password string
-}
 
 func main() {
 	err := constants.Init()
@@ -22,43 +19,118 @@ func main() {
 	}
 	defer constants.Db.Close()
 
-	// createUser("Priyanshu", "Abc@123")
-	verified, _ := verifyUser("Priyanshu", "Abc@123")
-	fmt.Println(verified)
+	fmt.Println("Select Action:")
+	fmt.Println("1. Sign In")
+	fmt.Println("2. Sign Up")
+	fmt.Println("3. Check Auth")
+
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	option, err := strconv.Atoi(strings.TrimSpace(scanner.Text()))
+
+	if err != nil {
+		fmt.Println("Please enter a number")
+		return
+	}
+
+	switch option {
+	case 1:
+	signIn()
+	case 2:
+	signUp()
+	case 3:
+	checkAuth()
+	default:
+	fmt.Println("Select a valid operation")
+	}
+
 }
 
-func createUser(username string, password string) error {
-	salt := constants.HashingSalt
-	hash, err := scrypt.Key([]byte(password), salt, 16384, 8, 1, 32)
+func signUp() {
+	fmt.Println("Sign Up")
+	scanner := bufio.NewScanner(os.Stdin)
 
+	// Ask for username
+	fmt.Print("Username: ")
+	var username string
+	scanner.Scan()
+	username = strings.TrimSpace(scanner.Text())
+
+	// Ask for password
+	fmt.Print("Password: ")
+	var password string
+	scanner.Scan()
+	password = strings.TrimSpace(scanner.Text())
+
+	// Create user
+	user, err := users.CreateUser(username, password)
 	if err != nil {
-		return err
+		log.Printf("Failed to create user: %s\n", err)
+		return
 	}
 
-	_, err = constants.Db.Exec("INSERT INTO User (username, password) VALUES (?,?);", username, hash)
+	// Create accesstoken
+	token, err := users.GenerateJwt(user)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Failed to create token: %s\n", err)
+		return
 	}
 
-	return err
+	fmt.Printf("Successfully signed up, here is the token:\n%s\n", token)
 }
 
-func verifyUser(username string, password string) (bool, error) {
-	salt := constants.HashingSalt
-	hash, err := scrypt.Key([]byte(password), salt, 16384, 8, 1, 32)
+func signIn() {
+	fmt.Println("Sign In")
+	scanner := bufio.NewScanner(os.Stdin)
 
+	// Ask for username
+	fmt.Print("Username: ")
+	var username string
+	scanner.Scan()
+	username = strings.TrimSpace(scanner.Text())
+
+	// Ask for password
+	fmt.Print("Password: ")
+	var password string
+	scanner.Scan()
+	password = strings.TrimSpace(scanner.Text())
+
+	// Create user
+	ok, user, err := users.VerifyUser(username, password)
 	if err != nil {
-		return false, err
+		log.Printf("Failed to verify user: %s\n", err)
+		return
+	}
+	if !ok {
+		fmt.Println("User does not exist, try signing up...")
+		return
 	}
 
-	var user User
-	row := constants.Db.QueryRow("SELECT * FROM USER WHERE username=? LIMIT 1;", username)
-
-	err = row.Scan(&user.Id, &user.Username, &user.Password)
+	// Create accesstoken
+	token, err := users.GenerateJwt(*user)
 	if err != nil {
-		return false, err
+		log.Printf("Failed to create token: %s\n", err)
+		return
 	}
 
-	fmt.Println(user)
-	return user.Password == string(hash), nil
+	fmt.Printf("Successfully signed in, here is the token:\n%s\n", token)
+}
+
+func checkAuth() {
+	fmt.Println("Paste token")
+	scanner := bufio.NewScanner(os.Stdin)
+
+	// Ask for username
+	var token string
+	scanner.Scan()
+	token = strings.TrimSpace(scanner.Text())
+
+	user, err := users.VerifyToken(token)
+	if err != nil {
+		fmt.Printf("Invalid token: %s\n", err)
+		return
+	}
+
+	fmt.Println("\nValid!")
+	fmt.Printf("%#v", user)
 }
